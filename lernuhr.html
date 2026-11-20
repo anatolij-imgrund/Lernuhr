@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lernuhr</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #FFF9F0 0%, #FFF0D6 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    gap: 1.5rem;
+  }
+  h1 { font-size: 2.2rem; font-weight: 900; color: #78350f; letter-spacing: -1px; }
+  .subtitle { color: #b45309; font-size: 1.1rem; font-weight: 500; margin-top: 0.2rem; }
+
+  /* Visibility switcher */
+  .vis-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+  .vis-label { font-size: 0.7rem; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 1px; }
+  .vis-btns { display: flex; border-radius: 14px; overflow: hidden; border: 2px solid #fcd34d; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .vis-btn {
+    padding: 0.45rem 1.3rem; font-size: 0.85rem; font-weight: 700;
+    border: none; cursor: pointer; transition: all 0.18s;
+    background: #fff; color: #b45309;
+  }
+  .vis-btn:hover { background: #fffbeb; }
+  .vis-btn.active { background: #fbbf24; color: #451a03; }
+  .vis-hint { font-size: 0.75rem; color: #b45309; font-style: italic; min-height: 1.1rem; }
+
+  /* Legend */
+  .legend { display: flex; gap: 1.2rem; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; color: #78350f; }
+  .legend-dot { width: 22px; height: 8px; border-radius: 4px; }
+
+  /* Clock card */
+  .card {
+    display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
+    background: rgba(255,255,255,0.45);
+    border-radius: 24px; padding: 2rem 2.5rem;
+    border: 1px solid #fde68a;
+    width: 100%; max-width: 360px;
+  }
+
+  /* Analog clock */
+  #analog-wrap { transition: opacity 0.4s, transform 0.4s; }
+  #analog-wrap.hidden { opacity: 0; transform: scale(0.92); pointer-events: none; height: 0; overflow: hidden; }
+
+  /* Digital clock */
+  #digital-wrap { transition: opacity 0.4s, transform 0.4s; }
+  #digital-wrap.hidden { opacity: 0; transform: scale(0.92); pointer-events: none; height: 0; overflow: hidden; }
+
+  .digital-box {
+    display: flex; align-items: stretch; gap: 2px;
+    background: #FFF9F0;
+    border-radius: 14px; padding: 0.5rem 1rem;
+    border: 2px solid #C8922A;
+    box-shadow: 0 2px 8px rgba(180,130,50,0.15);
+  }
+  .dig-seg { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dig-num {
+    font-family: Georgia, serif; font-size: 3rem; font-weight: 700;
+    line-height: 1; min-width: 2.8rem; text-align: center; user-select: none;
+  }
+  .dig-colon {
+    font-family: Georgia, serif; font-size: 3rem; font-weight: 700;
+    color: #C8922A; opacity: 0.5; line-height: 1;
+    align-self: center; padding-bottom: 2px; user-select: none;
+  }
+  .dig-arrow {
+    background: none; border: none; cursor: pointer;
+    font-size: 0.9rem; line-height: 1; padding: 0 10px; opacity: 0.75;
+  }
+  .dig-arrow:hover { opacity: 1; }
+  .dig-hint { font-size: 0.75rem; color: #92400e; font-weight: 500; }
+
+  /* Time-in-words */
+  #words-box {
+    background: #fef3c7; border: 2px solid #fcd34d;
+    border-radius: 16px; padding: 0.75rem 1.5rem; text-align: center;
+    transition: opacity 0.3s;
+  }
+  #words-box.hidden { display: none; }
+  #words-line1 { font-size: 1.2rem; font-weight: 800; color: #78350f; }
+  #words-line2 { font-size: 0.85rem; color: #b45309; margin-top: 2px; }
+
+  /* Options */
+  .options { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+  .opt-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: #78350f; }
+  .opt-label input { width: 16px; height: 16px; accent-color: #f59e0b; cursor: pointer; }
+
+  .tip { font-size: 0.72rem; color: #b45309; text-align: center; max-width: 300px; }
+
+  svg#clock { cursor: pointer; user-select: none; touch-action: none; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center">
+  <h1>Lernuhr</h1>
+  <p class="subtitle">Drehe die Zeiger oder stelle die Zeit ein!</p>
+</div>
+
+<div class="vis-wrap">
+  <div class="vis-label">Anzeige</div>
+  <div class="vis-btns">
+    <button class="vis-btn" data-vis="analog" onclick="setVis('analog')">Analog</button>
+    <button class="vis-btn" data-vis="digital" onclick="setVis('digital')">Digital</button>
+    <button class="vis-btn active" data-vis="both" onclick="setVis('both')">Beide</button>
+  </div>
+  <div class="vis-hint" id="vis-hint"></div>
+</div>
+
+<div class="legend" id="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#E8523A"></div>Stundenzeiger</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3A7BD5"></div>Minutenzeiger</div>
+  <div class="legend-item" id="sec-legend"><div class="legend-dot" style="background:#22C55E"></div>Sekundenzeiger</div>
+</div>
+
+<div class="card">
+  <div id="analog-wrap">
+    <svg id="clock" viewBox="0 0 300 300" width="280" height="280">
+      <!-- Rim -->
+      <circle cx="150" cy="150" r="140" fill="#E8D5B0"/>
+      <circle cx="150" cy="150" r="136" fill="#FFF9F0"/>
+      <circle cx="150" cy="150" r="130" fill="#FFFDF7"/>
+      <!-- Ticks & numbers drawn by JS -->
+      <g id="ticks"></g>
+      <g id="nums"></g>
+      <!-- Hands -->
+      <line id="min-hand" stroke="#3A7BD5" stroke-width="4" stroke-linecap="round"/>
+      <line id="min-tail" stroke="#3A7BD5" stroke-width="4" stroke-linecap="round"/>
+      <line id="hour-hand" stroke="#E8523A" stroke-width="7" stroke-linecap="round"/>
+      <line id="hour-tail" stroke="#E8523A" stroke-width="7" stroke-linecap="round"/>
+      <line id="sec-hand" stroke="#22C55E" stroke-width="2" stroke-linecap="round"/>
+      <!-- Center -->
+      <circle cx="150" cy="150" r="8" fill="#444"/>
+      <circle cx="150" cy="150" r="4" fill="white"/>
+    </svg>
+  </div>
+
+  <div id="digital-wrap">
+    <div class="digital-box">
+      <div class="dig-seg">
+        <button class="dig-arrow" id="h-up" style="color:#E8523A">&#9650;</button>
+        <div class="dig-num" id="h-disp" style="color:#E8523A">03</div>
+        <button class="dig-arrow" id="h-dn" style="color:#E8523A">&#9660;</button>
+      </div>
+      <div class="dig-colon">:</div>
+      <div class="dig-seg">
+        <button class="dig-arrow" id="m-up" style="color:#3A7BD5">&#9650;</button>
+        <div class="dig-num" id="m-disp" style="color:#3A7BD5">00</div>
+        <button class="dig-arrow" id="m-dn" style="color:#3A7BD5">&#9660;</button>
+      </div>
+      <div class="dig-colon" id="sec-colon">:</div>
+      <div class="dig-seg" id="sec-seg" style="justify-content:center">
+        <div style="height:1.6rem"></div>
+        <div class="dig-num" id="s-disp" style="color:#22C55E;font-size:2.2rem">00</div>
+        <div style="height:1.6rem"></div>
+      </div>
+    </div>
+    <div class="dig-hint" style="text-align:center;margin-top:6px">Pfeile druecken oder Zeiger drehen</div>
+  </div>
+</div>
+
+<div id="words-box">
+  <div id="words-line1">Es ist 03:00 Uhr</div>
+  <div id="words-line2">3 Uhr genau</div>
+</div>
+
+<div class="options">
+  <label class="opt-label">
+    <input type="checkbox" id="chk-sec" checked onchange="toggleSeconds(this.checked)">
+    Sekundenzeiger anzeigen
+  </label>
+  <label class="opt-label">
+    <input type="checkbox" id="chk-live" onchange="toggleLive(this.checked)">
+    Echtzeit
+  </label>
+</div>
+
+<p class="tip">Innerer Bereich der Uhr: Stundenzeiger <br> Äußerer Bereich: Minutenzeiger</p>
+
+<script>
+// ─── State ───────────────────────────────────────────────────
+let totalMinutes = 3 * 60; // 03:00
+let seconds = 0;
+let showSeconds = true;
+let liveMode = false;
+let visibility = 'both';
+let secInterval = null;
+let liveInterval = null;
+let dragging = null;
+let prevTM = totalMinutes;
+
+// ─── Clock face setup ────────────────────────────────────────
+const CX = 150, CY = 150, R = 130;
+function degToXY(deg, r) {
+  const rad = (deg - 90) * Math.PI / 180;
+  return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
+}
+
+(function buildFace() {
+  const tg = document.getElementById('ticks');
+  const ng = document.getElementById('nums');
+  for (let i = 0; i < 60; i++) {
+    const isH = i % 5 === 0;
+    const a = (i / 60) * 360;
+    const p1 = degToXY(a, isH ? R - 14 : R - 7);
+    const p2 = degToXY(a, R - 2);
+    const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    ln.setAttribute('x1', p1.x); ln.setAttribute('y1', p1.y);
+    ln.setAttribute('x2', p2.x); ln.setAttribute('y2', p2.y);
+    ln.setAttribute('stroke', isH ? '#B89060' : '#D4BC90');
+    ln.setAttribute('stroke-width', isH ? '2.5' : '1');
+    tg.appendChild(ln);
+  }
+  for (let i = 0; i < 12; i++) {
+    const num = i === 0 ? 12 : i;
+    const a = (i / 12) * 360;
+    const p = degToXY(a, R - 28);
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', p.x); t.setAttribute('y', p.y);
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('dominant-baseline', 'central');
+    t.setAttribute('font-size', '17');
+    t.setAttribute('font-weight', '700');
+    t.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+    t.setAttribute('fill', '#5A3E1B');
+    t.textContent = num;
+    ng.appendChild(t);
+  }
+})();
+
+// ─── Render ──────────────────────────────────────────────────
+function render() {
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const h12 = h24 % 12;
+
+  const minAngle = m * 6;
+  const hourAngle = (h12 * 60 + m) * 0.5;
+  const secAngle = seconds * 6;
+
+  function setHand(id, angle, r, tailR) {
+    const tip = degToXY(angle, r);
+    const tail = degToXY(angle + 180, tailR);
+    const el = document.getElementById(id);
+    el.setAttribute('x1', tail.x); el.setAttribute('y1', tail.y);
+    el.setAttribute('x2', tip.x); el.setAttribute('y2', tip.y);
+  }
+  setHand('hour-hand', hourAngle, 68, 14);
+  setHand('min-hand', minAngle, 112, 16);
+
+  const sh = document.getElementById('sec-hand');
+  if (showSeconds) {
+    sh.style.display = '';
+    const st = degToXY(secAngle, 118);
+    sh.setAttribute('x1', CX); sh.setAttribute('y1', CY);
+    sh.setAttribute('x2', st.x); sh.setAttribute('y2', st.y);
+  } else {
+    sh.style.display = 'none';
+  }
+
+  // Digital
+  document.getElementById('h-disp').textContent = String(h24).padStart(2, '0');
+  document.getElementById('m-disp').textContent = String(m).padStart(2, '0');
+  document.getElementById('s-disp').textContent = String(seconds).padStart(2, '0');
+
+  // Words
+  const h12disp = h12 === 0 ? 12 : h12;
+  const next = h12disp === 12 ? 1 : h12disp + 1;
+  let line2 = '';
+  if (m === 0) line2 = h12disp + ' Uhr genau';
+  else if (m < 15) line2 = m + ' Minuten nach ' + h12disp;
+  else if (m === 15) line2 = 'Viertel nach ' + h12disp;
+  else if (m < 30) line2 = (30 - m) + ' Minuten vor halb ' + next;
+  else if (m === 30) line2 = 'halb ' + next;
+  else if (m < 45) line2 = (m - 30) + ' Minuten nach halb ' + next;
+  else if (m === 45) line2 = 'Viertel vor ' + next;
+  else line2 = (60 - m) + ' Minuten vor ' + next;
+  document.getElementById('words-line1').textContent =
+    'Es ist ' + String(h24).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ' Uhr';
+  document.getElementById('words-line2').textContent = line2;
+}
+
+// ─── Seconds tick ────────────────────────────────────────────
+function startSecTick() {
+  stopSecTick();
+  secInterval = setInterval(() => { seconds = (seconds + 1) % 60; render(); }, 1000);
+}
+function stopSecTick() { if (secInterval) clearInterval(secInterval); secInterval = null; }
+
+// ─── Live mode ───────────────────────────────────────────────
+function toggleLive(on) {
+  liveMode = on;
+  if (on) {
+    stopSecTick();
+    liveInterval = setInterval(() => {
+      const now = new Date();
+      totalMinutes = now.getHours() * 60 + now.getMinutes();
+      seconds = now.getSeconds();
+      render();
+    }, 1000);
+    const now = new Date();
+    totalMinutes = now.getHours() * 60 + now.getMinutes();
+    seconds = now.getSeconds();
+    render();
+  } else {
+    if (liveInterval) clearInterval(liveInterval);
+    liveInterval = null;
+    startSecTick();
+  }
+}
+
+// ─── Seconds display toggle ──────────────────────────────────
+function toggleSeconds(on) {
+  showSeconds = on;
+  document.getElementById('sec-legend').style.display = on ? '' : 'none';
+  document.getElementById('sec-colon').style.display = on ? '' : 'none';
+  document.getElementById('sec-seg').style.display = on ? '' : 'none';
+  render();
+}
+
+// ─── Visibility ──────────────────────────────────────────────
+function setVis(v) {
+  visibility = v;
+  document.querySelectorAll('.vis-btn').forEach(b => b.classList.toggle('active', b.dataset.vis === v));
+  const showA = v === 'both' || v === 'analog';
+  const showD = v === 'both' || v === 'digital';
+  document.getElementById('analog-wrap').classList.toggle('hidden', !showA);
+  document.getElementById('digital-wrap').classList.toggle('hidden', !showD);
+  document.getElementById('words-box').classList.toggle('hidden', v !== 'both');
+  const hints = { analog: 'Digitale Uhr versteckt - rate die Zeit, dann "Beide" druecken!', digital: 'Analoge Uhr versteckt - rate die Zeit, dann "Beide" druecken!', both: '' };
+  document.getElementById('vis-hint').textContent = hints[v];
+}
+
+// ─── Drag on analog clock ────────────────────────────────────
+function getAngleFromEvent(e) {
+  const svg = document.getElementById('clock');
+  const rect = svg.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  let a = Math.atan2(clientY - cy, clientX - cx) * 180 / Math.PI + 90;
+  if (a < 0) a += 360;
+  return a;
+}
+
+document.getElementById('clock').addEventListener('mousedown', startDrag);
+document.getElementById('clock').addEventListener('touchstart', startDrag, { passive: false });
+
+function startDrag(e) {
+  e.preventDefault();
+  liveMode = false;
+  document.getElementById('chk-live').checked = false;
+  if (liveInterval) { clearInterval(liveInterval); liveInterval = null; startSecTick(); }
+
+  const svg = document.getElementById('clock');
+  const rect = svg.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const dist = Math.sqrt((clientX - cx) ** 2 + (clientY - cy) ** 2);
+  const scaledR = rect.width / 300 * R;
+  dragging = dist < scaledR * 0.38 ? 'hour' : 'minute';
+  prevTM = totalMinutes;
+
+  function onMove(ev) {
+    ev.preventDefault();
+    const angle = getAngleFromEvent(ev);
+    if (dragging === 'minute') {
+      const newMin = Math.round(angle / 6) % 60;
+      const curMin = prevTM % 60;
+      let diff = newMin - curMin;
+      if (diff > 30) diff -= 60;
+      if (diff < -30) diff += 60;
+      prevTM = (prevTM + diff + 1440) % 1440;
+      totalMinutes = prevTM;
+    } else {
+      const newH = Math.round(angle / 30) % 12;
+      const curH = Math.floor((prevTM % 720) / 60);
+      let diff = newH - curH;
+      if (diff > 6) diff -= 12;
+      if (diff < -6) diff += 12;
+      prevTM = (prevTM + diff * 60 + 1440) % 1440;
+      totalMinutes = prevTM;
+    }
+    seconds = 0;
+    render();
+  }
+
+  function onUp() {
+    dragging = null;
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    window.removeEventListener('touchend', onUp);
+  }
+
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('mouseup', onUp);
+  window.addEventListener('touchend', onUp);
+}
+
+// ─── Digital buttons ─────────────────────────────────────────
+document.getElementById('h-up').onclick = () => { liveMode = false; totalMinutes = (totalMinutes + 60 + 1440) % 1440; seconds = 0; render(); };
+document.getElementById('h-dn').onclick = () => { liveMode = false; totalMinutes = (totalMinutes - 60 + 1440) % 1440; seconds = 0; render(); };
+document.getElementById('m-up').onclick = () => { liveMode = false; totalMinutes = (totalMinutes + 1 + 1440) % 1440; seconds = 0; render(); };
+document.getElementById('m-dn').onclick = () => { liveMode = false; totalMinutes = (totalMinutes - 1 + 1440) % 1440; seconds = 0; render(); };
+
+// ─── Init ────────────────────────────────────────────────────
+render();
+startSecTick();
+</script>
+</body>
+</html>
